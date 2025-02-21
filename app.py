@@ -1,5 +1,4 @@
-# Importaciones
-import os  # Para acceder a las variables de entorno
+import os
 import gradio as gr
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
