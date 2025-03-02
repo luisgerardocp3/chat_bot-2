@@ -1,55 +1,62 @@
-import os
 import gradio as gr
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+from langdetect import detect
 
-# Configura el dispositivo (GPU si está disponible, si no, CPU)
+# Configura el modelo y el tokenizador
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print("Dispositivo:", device)
-
-# Usamos un modelo público en español
-MODEL_NAME = "bertin-project/bertin-gpt-j-6B"  # Modelo en español, gratuito y público
+MODEL_NAME = "PlanTL-GOB-ES/gpt2-base-bne"  # Modelo en español
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForCausalLM.from_pretrained(MODEL_NAME).to(device)
 
-# Función del Chatbot
-def generar_respuesta_lujo(mensaje, historial):
-    # Prepara el prompt
-    prompt = f"""Eres CYBERNEXUS-AI, un asistente virtual profesional en español. Responde de forma clara, breve y útil.
-    Siempre mantén un tono formal y amable.
-    Si no entiendes algo, pide más detalles.
-    No inventes información ni des respuestas cortantes.
+# Función para detectar el idioma
+def detectar_idioma(texto):
+    try:
+        return detect(texto)
+    except:
+        return "es"  # Por defecto, español
 
-    Usuario: {mensaje}
-    Asistente:"""
-
-    # Tokeniza el prompt y genera la respuesta
+# Función para generar respuestas
+def generar_respuesta(mensaje, historial=[]):
+    idioma = detectar_idioma(mensaje)
+    
+    # Ajusta el prompt según el idioma
+    if idioma == "es":
+        prompt = f"Usuario: {mensaje}\nAsistente:"
+    else:
+        prompt = f"User: {mensaje}\nAssistant:"
+    
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
     outputs = model.generate(
         **inputs,
-        max_new_tokens=50,  # Limita la longitud de la respuesta para ahorrar RAM
+        max_new_tokens=50,
         do_sample=True,
-        temperature=0.1,  # Reduce la temperatura para más coherencia
-        top_p=0.9,  # Filtra las opciones menos probables
-        repetition_penalty=2.0,  # Aumenta la penalización por repeticiones
-        num_beams=1  # Usa búsqueda greedy para ahorrar RAM
+        temperature=0.7,
+        top_p=0.9,
+        repetition_penalty=2.0  # Penalización por repetición
     )
-    respuesta = tokenizer.decode(outputs[0], skip_special_tokens=True).split("Asistente:")[-1]
-
-    # Añade la respuesta al historial
-    historial.append((mensaje, respuesta))  # Formato: [(usuario, asistente), ...]
-
-    # Devuelve el historial actualizado
+    respuesta = tokenizer.decode(outputs[0], skip_special_tokens=True).split("\n")[-1]
+    historial.append((mensaje, respuesta))
     return historial
 
-# Interfaz de Gradio
+# Interfaz personalizada con Gradio Blocks
 with gr.Blocks() as demo:
-    chatbot = gr.Chatbot(label="CONSOLE")
-    entrada = gr.Textbox(label="COMANDO", placeholder="Escribe tu consulta", lines=1)
-    gr.Button("ENVIAR 🚀").click(generar_respuesta_lujo, [entrada, chatbot], chatbot)
+    gr.Markdown("# 🤖 CIBERNEXUS - Chatbot Multilingüe")
+    
+    # Área de publicidad
+    gr.HTML("""
+    <div style="text-align: center; padding: 10px; background-color: #f0f0f0; border-radius: 10px;">
+        <h3>Espacio Publicitario</h3>
+        <p>Contáctanos para anunciarte aquí.</p>
+    </div>
+    """)
+    
+    with gr.Row():
+        chatbot = gr.Chatbot(label="Conversación", height=500)  # Aumenta la altura
+        with gr.Column():
+            entrada = gr.Textbox(label="Escribe tu mensaje", placeholder="Hola, ¿cómo estás?")
+            boton = gr.Button("Enviar 🚀")
+    boton.click(generar_respuesta, entrada, chatbot)
 
-# Usa la variable de entorno PORT, o 7860 si no está definida
-PORT = int(os.environ.get("PORT", 7860))
-
-# Lanza la aplicación
-demo.launch(server_name="0.0.0.0", server_port=PORT)
+# Ejecuta la aplicación
+demo.launch()

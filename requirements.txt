@@ -1,5 +1,4 @@
 gradio
 transformers
-sentencepiece
-accelerate
 torch
+langdetect
